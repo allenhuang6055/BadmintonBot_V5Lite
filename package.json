@@ -1,15 +1,1 @@
-{
-  "name": "badmintonbot-v5lite",
-  "version": "1.0.0",
-  "description": "健好羽球 V5 Lite LINE 記帳機器人",
-  "main": "bot.js",
-  "scripts": {
-    "start": "node bot.js"
-  },
-  "dependencies": {
-    "@line/bot-sdk": "^10.2.0",
-    "dotenv": "^17.0.0",
-    "express": "^5.1.0",
-    "googleapis": "^150.0.1"
-  }
-}
+{"name":"badmintonbot-v5lite","version":"1.1.0","main":"bot.js","scripts":{"start":"node bot.js"},"dependencies":{"@line/bot-sdk":"^10.2.0","dotenv":"^17.0.0","express":"^5.1.0","googleapis":"^150.0.1"}}
