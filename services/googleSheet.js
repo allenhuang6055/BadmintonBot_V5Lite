@@ -1,7 +1,7 @@
 require("dotenv").config();
 const { google } = require("googleapis");
 
-const DB_SHEET = "02_LINEè³‡æ?åº?;
+const DB_SHEET = "02_LINE¸ê®Æ®w";
 const SETTINGS_SHEET = "08_?…ç›®è¨­å?";
 
 function getGoogleAuth() {
