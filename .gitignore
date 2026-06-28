@@ -1,3 +1,4 @@
-node_modules/ 
-.env 
-credentials.json 
+node_modules/
+.env
+credentials.json
+.DS_Store

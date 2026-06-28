@@ -1,30 +1,26 @@
-function mainMenuMessage() {
+function quickReply(items) {
   return {
-    type: "text",
-    text: `🏸 健好羽球記帳\n\n請選擇功能👇`,
-    quickReply: {
-      items: [
-        { type: "action", action: { type: "message", label: "💰 收入", text: "收入" } },
-        { type: "action", action: { type: "message", label: "💸 支出", text: "支出" } },
-        { type: "action", action: { type: "message", label: "🏦 交款", text: "交款" } },
-        { type: "action", action: { type: "message", label: "📊 今天", text: "今天" } },
-        { type: "action", action: { type: "message", label: "📅 本月", text: "本月" } },
-        { type: "action", action: { type: "message", label: "👤 我的未交", text: "我的未交" } }
-      ]
-    }
+    items: items.map(([label, text]) => ({
+      type: "action",
+      action: { type: "message", label, text }
+    }))
   };
 }
 
-function confirmMessage(text) {
+function mainMenuMessage() {
   return {
     type: "text",
-    text,
-    quickReply: {
-      items: [
-        { type: "action", action: { type: "message", label: "✅ 確認", text: "確認" } },
-        { type: "action", action: { type: "message", label: "❌ 取消", text: "取消" } }
-      ]
-    }
+    text: "🏸 健好羽球財務系統 V8\n\n請選擇功能👇",
+    quickReply: quickReply([
+      ["💰 收入＋耗球", "收入"],
+      ["💸 支出", "支出"],
+      ["💵 交款", "交款"],
+      ["📊 今天", "今天"],
+      ["📅 本月", "本月"],
+      ["👤 我的未交", "我的未交"],
+      ["🏸 球庫存", "球庫存"]
+    ])
   };
 }
-module.exports = { mainMenuMessage, confirmMessage };
+
+module.exports = { mainMenuMessage, quickReply };

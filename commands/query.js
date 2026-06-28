@@ -1,19 +1,47 @@
-const { getSummary } = require("../services/googleSheet");
+const { getSummary, getCurrentStock } = require("../services/googleSheet");
 
-function isTodayQuery(text) { return text === "今天" || text === "今日"; }
-function isMonthQuery(text) { return text === "本月" || text === "月報"; }
-function isMyUnpaidQuery(text) { return text === "我的未交"; }
+function formatSummary(title, s, stock = null) {
+  return `📊 ${title}
 
-function formatSummary(title, s) {
-  return `📊 ${title}\n\n收入：${s.income} 元\n支出：${s.expense} 元\n結餘：${s.balance} 元\n\n交款：${s.payment} 元\n未交：${s.unpaid} 元`;
+收入：${s.income} 元
+支出：${s.expense} 元
+盈餘：${s.profit} 元
+
+交款：${s.payment} 元
+未交：${s.unpaid} 元
+耗球：${s.ballsUsed} 顆${stock === null ? "" : `\n庫存：${stock} 顆`}`;
 }
 
-async function handleTodayQuery() { return formatSummary("今日統計", await getSummary("today")); }
-async function handleMonthQuery() { return formatSummary("本月統計", await getSummary("month")); }
+async function handleToday() {
+  const s = await getSummary("today");
+  const stock = await getCurrentStock();
+  return formatSummary("今日統計", s, stock);
+}
 
-async function handleMyUnpaidQuery(user) {
+async function handleMonth() {
+  const s = await getSummary("month");
+  const stock = await getCurrentStock();
+  return formatSummary("本月統計", s, stock);
+}
+
+async function handleMyUnpaid(user) {
   const s = await getSummary("month", user.id);
-  return `👤 我的未交\n\n填表人：${user.name}\n\n本月收入：${s.income} 元\n本月交款：${s.payment} 元\n尚未繳交：${s.unpaid} 元`;
+  return `👤 我的未交
+
+填表人：${user.name}
+
+本月收入：${s.income} 元
+本月交款：${s.payment} 元
+尚未交回：${s.unpaid} 元`;
 }
 
-module.exports = { isTodayQuery, isMonthQuery, isMyUnpaidQuery, handleTodayQuery, handleMonthQuery, handleMyUnpaidQuery };
+async function handleStock() {
+  const stock = await getCurrentStock();
+  return `🏸 羽球庫存
+
+目前剩餘：${stock} 顆
+
+提醒：耗球請在「收入＋耗球」模板一起輸入。`;
+}
+
+module.exports = { handleToday, handleMonth, handleMyUnpaid, handleStock };

@@ -1,35 +1,32 @@
-const { appendRecords } = require("../services/googleSheet");
+const { appendRecords, getSummary } = require("../services/googleSheet");
+const { parseAmount, parseNote } = require("./income");
 
-function isPaymentCommand(text) {
-  return text === "交款" || text === "🏦 交款";
+function paymentTemplate() {
+  return `💵 幹部交款
+
+交款：0
+
+備註：`;
 }
 
 function isPaymentRecord(text) {
-  return text.includes("交款");
-}
-
-function getPaymentAmount(text) {
-  const m = text.match(/交款\s*[:：=]?\s*([0-9,]+)/i);
-  return m ? Number(m[1].replace(/,/g, "")) : 0;
-}
-
-function getNote(text) {
-  const m = text.match(/備註\s*[:：=]?\s*(.+)/i);
-  return m ? m[1].trim() : "";
-}
-
-function paymentTemplateMessage() {
-  return { type: "text", text: `🏦 交款\n\n交款：0\n\n備註：` };
+  return /交款\s*[:：=]/.test(text);
 }
 
 async function handlePayment(text, user) {
-  const amount = getPaymentAmount(text);
-  const note = getNote(text);
-  if (amount <= 0) throw new Error("沒有讀到交款金額");
+  const amount = parseAmount(text, "交款");
+  const note = parseNote(text);
+  if (amount <= 0) throw new Error("沒有讀到交款金額。請確認格式，例如：交款：5000");
+  await appendRecords([{ type: "交款", item: "交款", payment: amount, note }], user);
+  const my = await getSummary("month", user.id);
+  return `✅ 交款完成
 
-  await appendRecords([{ type: "交款", item: "交款", amount, note }], user);
+填表人：${user.name}
+交款：${amount} 元
 
-  return `✅ 交款記錄成功\n\n填表人：${user.name}\n交款金額：${amount} 元\n\n備註：${note || "無"}`;
+💰 我的未交：${my.unpaid} 元
+
+備註：${note || "無"}`;
 }
 
-module.exports = { isPaymentCommand, isPaymentRecord, paymentTemplateMessage, handlePayment };
+module.exports = { paymentTemplate, isPaymentRecord, handlePayment };

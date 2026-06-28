@@ -1,47 +1,40 @@
-const { getEnabledItems, appendRecords } = require("../services/googleSheet");
+const { getEnabledItems, appendRecords, getSummary } = require("../services/googleSheet");
+const { parseAmount, parseNote } = require("./income");
 
-function isIncomeCommand(text) {
-  return text === "支出" || text === "💸 支出";
-}
-
-function getNumber(text, label) {
-  const re = new RegExp(`${label}\\s*[:：=]?\\s*([0-9,]+)`, "i");
-  const m = text.match(re);
-  return m ? Number(m[1].replace(/,/g, "")) : 0;
-}
-
-function getNote(text) {
-  const m = text.match(/備註\s*[:：=]?\s*(.+)/i);
-  return m ? m[1].trim() : "";
-}
-
-async function incomeTemplateMessage() {
+async function expenseTemplate() {
   const items = await getEnabledItems("支出");
   const body = items.map(item => `${item}：0`).join("\n");
-  return { type: "text", text: `💸 支出\n\n${body}\n\n備註：` };
+  return `💸 支出
+
+${body}
+
+備註：`;
 }
 
-async function isIncomeRecord(text) {
+async function isExpenseRecord(text) {
   const items = await getEnabledItems("支出");
-  return items.some(item => text.includes(item));
+  return items.some(item => new RegExp(`${item}\\s*[:：=]`).test(text));
 }
 
-async function handleIncome(text, user) {
+async function handleExpense(text, user) {
   const items = await getEnabledItems("支出");
-  const note = getNote(text);
+  const note = parseNote(text);
   const records = [];
-
   for (const item of items) {
-    const amount = getNumber(text, item);
-    if (amount > 0) records.push({ type: "支出", item, amount, note });
+    const amount = parseAmount(text, item);
+    if (amount > 0) records.push({ type: "支出", item, expense: amount, note });
   }
-
-  if (records.length === 0) throw new Error("沒有讀到支出金額");
-
+  if (!records.length) throw new Error("沒有讀到支出金額。請確認格式，例如：買球：690");
   await appendRecords(records, user);
-  const total = records.reduce((sum, r) => sum + r.amount, 0);
+  const total = records.reduce((sum, r) => sum + (r.expense || 0), 0);
+  const month = await getSummary("month");
+  return `✅ 支出完成
 
-  return `✅ 支出記帳成功\n\n填表人：${user.name}\n支出合計：${total} 元\n筆數：${records.length}\n\n備註：${note || "無"}`;
+填表人：${user.name}
+支出合計：${total} 元
+本月盈餘：${month.profit} 元
+
+備註：${note || "無"}`;
 }
 
-module.exports = { isIncomeCommand, isIncomeRecord, incomeTemplateMessage, handleIncome };
+module.exports = { expenseTemplate, isExpenseRecord, handleExpense };
