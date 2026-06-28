@@ -71,7 +71,6 @@ async function appendRows(sheetName, values) {
   });
 
   console.log("WRITE_RESULT:", JSON.stringify(res.data));
-
   return res.data;
 }
 
