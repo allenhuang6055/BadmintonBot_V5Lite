@@ -3,6 +3,7 @@ const { google } = require("googleapis");
 
 const DB_SHEET = "02_LINE\u8cc7\u6599\u5eab";
 const SETTINGS_SHEET = "08_\u9805\u76ee\u8a2d\u5b9a";
+const HOME_SHEET = "00_\u9996\u9801";
 
 function sheetRange(sheetName, range) {
   return `'${sheetName}'!${range}`;
@@ -40,23 +41,38 @@ async function getRows(sheetName, range = "A:AA") {
   return res.data.values || [];
 }
 
+async function findNextWriteRow(sheetName) {
+  const rows = await getRows(sheetName, "A:A");
+  let nextRow = 4;
+
+  for (let i = 3; i < rows.length; i++) {
+    if (rows[i] && rows[i][0]) {
+      nextRow = i + 2;
+    }
+  }
+
+  return nextRow;
+}
+
 async function appendRows(sheetName, values) {
   const sheets = getSheets();
+  const nextRow = await findNextWriteRow(sheetName);
+  const endRow = nextRow + values.length - 1;
+  const targetRange = sheetRange(sheetName, `A${nextRow}:O${endRow}`);
 
-  console.log("READY_WRITE_SHEET:", sheetName);
-  console.log("READY_WRITE_RANGE:", sheetRange(sheetName, "A:O"));
-  console.log("READY_WRITE_VALUES:", JSON.stringify(values));
+  console.log("WRITE_TARGET:", targetRange);
+  console.log("WRITE_VALUES:", JSON.stringify(values));
 
-  const res = await sheets.spreadsheets.values.append({
+  const res = await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: sheetRange(sheetName, "A:O"),
+    range: targetRange,
     valueInputOption: "USER_ENTERED",
-    insertDataOption: "INSERT_ROWS",
     requestBody: { values },
   });
 
-  console.log("WRITE_RESULT:", JSON.stringify(res.data.updates));
-  return res.data.updates;
+  console.log("WRITE_RESULT:", JSON.stringify(res.data));
+
+  return res.data;
 }
 
 function taipeiDate() {
@@ -82,6 +98,15 @@ function n(value) {
 function normalizeBool(value) {
   const s = String(value ?? "").trim().toUpperCase();
   return ["TRUE", "YES", "Y", "1", "\u662f", "\u555f\u7528"].includes(s);
+}
+
+function formatStock(balls) {
+  const value = Number(balls || 0);
+  const tubes = Math.floor(value / 12);
+  const rest = value % 12;
+
+  if (rest === 0) return `${tubes}\u6876`;
+  return `${tubes}\u6876 + ${rest}\u9846`;
 }
 
 async function getEnabledItems(type) {
@@ -117,7 +142,7 @@ async function getEnabledItems(type) {
 }
 
 async function appendRecords(records, user) {
-  if (!records.length) return;
+  if (!records.length) return null;
 
   const values = records.map((r) => [
     r.date || taipeiDate(),
@@ -223,7 +248,7 @@ async function getCurrentStock() {
   let initialStock = 0;
 
   try {
-    const homeRows = await getRows("00_\u9996\u9801", "B6:B6");
+    const homeRows = await getRows(HOME_SHEET, "B6:B6");
     initialStock = n(homeRows[0]?.[0]);
   } catch (err) {
     console.error("READ_INITIAL_STOCK_FAILED:", err.message);
@@ -237,4 +262,5 @@ module.exports = {
   appendRecords,
   getSummary,
   getCurrentStock,
+  formatStock,
 };
