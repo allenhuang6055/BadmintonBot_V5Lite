@@ -32,12 +32,10 @@ function getSheets() {
 
 async function getRows(sheetName, range = "A:AA") {
   const sheets = getSheets();
-
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
     range: sheetRange(sheetName, range),
   });
-
   return res.data.values || [];
 }
 
@@ -46,9 +44,7 @@ async function findNextWriteRow(sheetName) {
   let nextRow = 4;
 
   for (let i = 3; i < rows.length; i++) {
-    if (rows[i] && rows[i][0]) {
-      nextRow = i + 2;
-    }
+    if (rows[i] && rows[i][0]) nextRow = i + 2;
   }
 
   return nextRow;
@@ -58,7 +54,7 @@ async function appendRows(sheetName, values) {
   const sheets = getSheets();
   const nextRow = await findNextWriteRow(sheetName);
   const endRow = nextRow + values.length - 1;
-  const targetRange = sheetRange(sheetName, `A${nextRow}:O${endRow}`);
+  const targetRange = sheetRange(sheetName, `A${nextRow}:AA${endRow}`);
 
   console.log("WRITE_TARGET:", targetRange);
   console.log("WRITE_VALUES:", JSON.stringify(values));
@@ -103,7 +99,6 @@ function formatStock(balls) {
   const value = Number(balls || 0);
   const tubes = Math.floor(value / 12);
   const rest = value % 12;
-
   if (rest === 0) return `${tubes}\u6876`;
   return `${tubes}\u6876 + ${rest}\u9846`;
 }
@@ -129,55 +124,62 @@ async function getEnabledItems(type) {
     console.error("READ_SETTINGS_FAILED:", err.message);
   }
 
-  if (type === "\u6536\u5165") {
-    return ["\u96f6\u6253", "\u7403\u5238", "\u6703\u54e1", "\u5176\u4ed6"];
-  }
-
-  if (type === "\u652f\u51fa") {
-    return ["\u8cb7\u7403", "\u5834\u79df", "\u805a\u9910", "\u96dc\u652f"];
-  }
-
+  if (type === "\u6536\u5165") return ["\u96f6\u6253", "\u7403\u5238", "\u6703\u54e1", "\u5176\u4ed6"];
+  if (type === "\u652f\u51fa") return ["\u8cb7\u7403", "\u5834\u79df", "\u805a\u9910", "\u96dc\u652f"];
   return [];
 }
 
 async function appendRecords(records, user) {
   if (!records.length) return null;
 
-  const values = records.map((r) => [
-    r.date || taipeiDate(),
-    user.id,
-    user.name,
-    r.type,
-    r.item,
-    r.income || 0,
-    r.expense || 0,
-    r.ballsUsed || 0,
-    r.ballsIn || 0,
-    r.payment || 0,
-    r.note || "",
-    "\u6709\u6548",
-    taipeiNow(),
-    "",
-    "",
-  ]);
+  const values = records.map((r) => {
+    const income = r.income || 0;
+    const expense = r.expense || 0;
+    const ballsUsed = r.ballsUsed || 0;
+    const ballsIn = r.ballsIn || 0;
+    const payment = r.payment || 0;
+
+    return [
+      r.date || taipeiDate(),
+      user.id,
+      user.name,
+      r.type,
+      r.item,
+      income,
+      expense,
+      ballsUsed,
+      ballsIn,
+      payment,
+      r.note || "",
+      "\u6709\u6548",
+      taipeiNow(),
+      "",
+      "",
+
+      "", "", "", "", "", "", "",
+
+      income,
+      expense,
+      ballsUsed,
+      ballsIn,
+      payment,
+    ];
+  });
 
   return appendRows(DB_SHEET, values);
 }
 
 function parseDate(value) {
   if (!value) return null;
-
   if (typeof value === "number") {
     return new Date((value - 25569) * 86400 * 1000);
   }
-
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function isSameDay(dateText, now) {
   const d = parseDate(dateText);
-
   return (
     d &&
     d.getFullYear() === now.getFullYear() &&
