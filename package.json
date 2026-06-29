@@ -1,7 +1,7 @@
 {
-  "name": "badmintonbot-v8",
-  "version": "8.0.0",
-  "description": "健好羽球 LINE Bot V8 正式版",
+  "name": "badmintonbot-v8-final",
+  "version": "8.1.0",
+  "description": "健好羽球 LINE Bot V8.1 群組通知版",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"

@@ -5,6 +5,7 @@ const line = require("@line/bot-sdk");
 
 const { mainMenuMessage } = require("./config/menu");
 const { getUser } = require("./services/lineUser");
+const { pushGroupMessage, buildGroupNotice } = require("./services/groupNotify");
 const { incomeTemplate, isIncomeRecord, handleIncome } = require("./commands/income");
 const { expenseTemplate, isExpenseRecord, handleExpense } = require("./commands/expense");
 const { paymentTemplate, isPaymentRecord, handlePayment } = require("./commands/payment");
@@ -14,12 +15,16 @@ const app = express();
 
 const config = {
   channelSecret: process.env.LINE_CHANNEL_SECRET,
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
 };
 
-const client = new line.messagingApi.MessagingApiClient({ channelAccessToken: config.channelAccessToken });
+const client = new line.messagingApi.MessagingApiClient({
+  channelAccessToken: config.channelAccessToken,
+});
 
-app.get("/", (req, res) => res.send("BadmintonBot V8 is running"));
+app.get("/", (req, res) => {
+  res.send("BadmintonBot V8.1 group notify is running");
+});
 
 app.post("/webhook", line.middleware(config), async (req, res) => {
   try {
@@ -32,11 +37,27 @@ app.post("/webhook", line.middleware(config), async (req, res) => {
 });
 
 async function replyText(replyToken, text) {
-  return client.replyMessage({ replyToken, messages: [{ type: "text", text }] });
+  return client.replyMessage({
+    replyToken,
+    messages: [{ type: "text", text }],
+  });
 }
 
 async function replyMessages(replyToken, messages) {
   return client.replyMessage({ replyToken, messages });
+}
+
+function getSourceType(event) {
+  return event.source?.type || "";
+}
+
+async function notifyGroupSafely(kind, user, resultText) {
+  try {
+    const notice = buildGroupNotice(kind, user, resultText);
+    await pushGroupMessage(client, notice);
+  } catch (err) {
+    console.error("GROUP_NOTIFY_FAILED:", err.message);
+  }
 }
 
 async function handleEvent(event) {
@@ -46,6 +67,22 @@ async function handleEvent(event) {
   const user = await getUser(client, event);
 
   try {
+    if (text === "群組ID" || text.toLowerCase() === "groupid") {
+      if (getSourceType(event) !== "group" || !event.source.groupId) {
+        return replyText(event.replyToken, "這個指令請在球隊群組裡輸入，才會顯示 groupId。");
+      }
+
+      return replyText(
+        event.replyToken,
+        `✅ 這個群組的 LINE_GROUP_ID 是：
+
+${event.source.groupId}
+
+請到 Render → Environment 新增或修改：
+LINE_GROUP_ID=${event.source.groupId}`
+      );
+    }
+
     if (text === "選單" || text === "功能" || text.toLowerCase() === "menu") {
       return replyMessages(event.replyToken, [mainMenuMessage()]);
     }
@@ -79,15 +116,21 @@ async function handleEvent(event) {
     }
 
     if (await isIncomeRecord(text)) {
-      return replyText(event.replyToken, await handleIncome(text, user));
+      const resultText = await handleIncome(text, user);
+      await notifyGroupSafely("income", user, resultText);
+      return replyText(event.replyToken, resultText);
     }
 
     if (await isExpenseRecord(text)) {
-      return replyText(event.replyToken, await handleExpense(text, user));
+      const resultText = await handleExpense(text, user);
+      await notifyGroupSafely("expense", user, resultText);
+      return replyText(event.replyToken, resultText);
     }
 
     if (isPaymentRecord(text)) {
-      return replyText(event.replyToken, await handlePayment(text, user));
+      const resultText = await handlePayment(text, user);
+      await notifyGroupSafely("payment", user, resultText);
+      return replyText(event.replyToken, resultText);
     }
 
     return;
@@ -102,4 +145,6 @@ async function handleEvent(event) {
 }
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`BadmintonBot V8 running on port ${port}`));
+app.listen(port, () => {
+  console.log(`BadmintonBot V8.1 running on port ${port}`);
+});

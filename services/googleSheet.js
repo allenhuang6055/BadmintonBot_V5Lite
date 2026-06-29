@@ -1,9 +1,9 @@
 require("dotenv").config();
 const { google } = require("googleapis");
 
-const DB_SHEET = "02_LINE\u8cc7\u6599\u5eab";
-const SETTINGS_SHEET = "08_\u9805\u76ee\u8a2d\u5b9a";
-const HOME_SHEET = "00_\u9996\u9801";
+const DB_SHEET = "02_LINE資料庫";
+const SETTINGS_SHEET = "08_項目設定";
+const HOME_SHEET = "00_首頁";
 
 function sheetRange(sheetName, range) {
   return `'${sheetName}'!${range}`;
@@ -50,7 +50,7 @@ async function findNextWriteRow(sheetName) {
   return nextRow;
 }
 
-async function appendRows(sheetName, values) {
+async function writeRows(sheetName, values) {
   const sheets = getSheets();
   const nextRow = await findNextWriteRow(sheetName);
   const endRow = nextRow + values.length - 1;
@@ -80,9 +80,7 @@ function taipeiDate() {
 }
 
 function taipeiNow() {
-  return new Date().toLocaleString("zh-TW", {
-    timeZone: "Asia/Taipei",
-  });
+  return new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" });
 }
 
 function n(value) {
@@ -92,21 +90,20 @@ function n(value) {
 
 function normalizeBool(value) {
   const s = String(value ?? "").trim().toUpperCase();
-  return ["TRUE", "YES", "Y", "1", "\u662f", "\u555f\u7528"].includes(s);
+  return ["TRUE", "YES", "Y", "1", "是", "啟用"].includes(s);
 }
 
 function formatStock(balls) {
   const value = Number(balls || 0);
   const tubes = Math.floor(value / 12);
   const rest = value % 12;
-  if (rest === 0) return `${tubes}\u6876`;
-  return `${tubes}\u6876 + ${rest}\u9846`;
+  if (rest === 0) return `${tubes}桶`;
+  return `${tubes}桶 + ${rest}顆`;
 }
 
 async function getEnabledItems(type) {
   try {
     const rows = await getRows(SETTINGS_SHEET, "A:F");
-
     const items = rows
       .slice(3)
       .filter((row) => String(row[0] || "").trim() === type)
@@ -124,13 +121,15 @@ async function getEnabledItems(type) {
     console.error("READ_SETTINGS_FAILED:", err.message);
   }
 
-  if (type === "\u6536\u5165") return ["\u96f6\u6253", "\u7403\u5238", "\u6703\u54e1", "\u5176\u4ed6"];
-  if (type === "\u652f\u51fa") return ["\u8cb7\u7403", "\u5834\u79df", "\u805a\u9910", "\u96dc\u652f"];
+  if (type === "收入") return ["零打", "球券", "會員", "其他"];
+  if (type === "支出") return ["買球", "場租", "聚餐", "雜支"];
   return [];
 }
 
 async function appendRecords(records, user) {
   if (!records.length) return null;
+
+  const now = taipeiNow();
 
   const values = records.map((r) => {
     const income = r.income || 0;
@@ -139,34 +138,38 @@ async function appendRecords(records, user) {
     const ballsIn = r.ballsIn || 0;
     const payment = r.payment || 0;
 
-    return [
-      r.date || taipeiDate(),
-      user.id,
-      user.name,
-      r.type,
-      r.item,
-      income,
-      expense,
-      ballsUsed,
-      ballsIn,
-      payment,
-      r.note || "",
-      "\u6709\u6548",
-      taipeiNow(),
-      "",
-      "",
-
-      "", "", "", "", "", "", "",
-
-      income,
-      expense,
-      ballsUsed,
-      ballsIn,
-      payment,
+    const raw = [
+      r.date || taipeiDate(), // A
+      user.id,                // B
+      user.name,              // C
+      r.type,                 // D
+      r.item,                 // E
+      income,                 // F
+      expense,                // G
+      ballsUsed,              // H
+      ballsIn,                // I
+      payment,                // J
+      r.note || "",           // K
+      "有效",                 // L
+      now,                    // M
+      "",                     // N
+      "",                     // O
     ];
+
+    const corrections = ["", "", "", "", "", "", ""]; // P:V
+
+    const finals = [
+      income,      // W 最終收入
+      expense,     // X 最終支出
+      ballsUsed,   // Y 最終耗球
+      ballsIn,     // Z 最終入庫
+      payment,     // AA 最終交款
+    ];
+
+    return raw.concat(corrections).concat(finals);
   });
 
-  return appendRows(DB_SHEET, values);
+  return writeRows(DB_SHEET, values);
 }
 
 function parseDate(value) {
@@ -206,9 +209,9 @@ async function getSummary(scope, userId = null) {
   for (const row of rows.slice(3)) {
     const date = row[0];
     const lineId = row[1];
-    const status = String(row[11] || "").trim() || "\u6709\u6548";
+    const status = String(row[11] || "").trim() || "有效";
 
-    if (status !== "\u6709\u6548") continue;
+    if (status !== "有效") continue;
     if (userId && lineId !== userId) continue;
 
     const match = scope === "today" ? isSameDay(date, now) : isSameMonth(date, now);
@@ -234,20 +237,18 @@ async function getSummary(scope, userId = null) {
 
 async function getCurrentStock() {
   const rows = await getRows(DB_SHEET, "A:AA");
-
   let ballsUsed = 0;
   let ballsIn = 0;
 
   for (const row of rows.slice(3)) {
-    const status = String(row[11] || "").trim() || "\u6709\u6548";
-    if (status !== "\u6709\u6548") continue;
+    const status = String(row[11] || "").trim() || "有效";
+    if (status !== "有效") continue;
 
     ballsUsed += n(row[24] ?? row[7]);
     ballsIn += n(row[25] ?? row[8]);
   }
 
   let initialStock = 0;
-
   try {
     const homeRows = await getRows(HOME_SHEET, "B6:B6");
     initialStock = n(homeRows[0]?.[0]);

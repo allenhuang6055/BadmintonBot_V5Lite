@@ -10,7 +10,6 @@ function parseAmount(text, label) {
   const safe = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const re = new RegExp(`${safe}\\s*[:：=]?\\s*([0-9,]+)`, "i");
   const m = text.match(re);
-
   if (!m) return 0;
 
   const num = Number(String(m[1]).replace(/,/g, ""));
@@ -18,63 +17,51 @@ function parseAmount(text, label) {
 }
 
 function parseNote(text) {
-  const m = text.match(/\u5099\u8a3b\s*[:：=]?\s*(.*)/i);
+  const m = text.match(/備註\s*[:：=]?\s*(.*)/i);
   return m ? String(m[1] || "").trim() : "";
 }
 
 async function incomeTemplate() {
-  const items = await getEnabledItems("\u6536\u5165");
-  const body = items.map((item) => `${item}\uff1a0`).join("\n");
+  const items = await getEnabledItems("收入");
+  const body = items.map((item) => `${item}：0`).join("\n");
   const stock = await getCurrentStock();
 
-  return `\ud83d\udcb0 \u6536\u5165\uff0b\u8017\u7403
+  return `💰 收入＋耗球
 
-\u76ee\u524d\u5eab\u5b58\uff1a${formatStock(stock)}
+目前庫存：${formatStock(stock)}
 
 ${body}
 
-\u8017\u7403\uff1a0
+耗球：0
 
-\u5099\u8a3b\uff1a`;
+備註：`;
 }
 
 async function isIncomeRecord(text) {
-  if (/\u8017\u7403\s*[:：=]/.test(text)) return true;
-
-  const items = await getEnabledItems("\u6536\u5165");
+  if (/耗球\s*[:：=]/.test(text)) return true;
+  const items = await getEnabledItems("收入");
   return items.some((item) => new RegExp(`${item}\\s*[:：=]`).test(text));
 }
 
 async function handleIncome(text, user) {
-  const items = await getEnabledItems("\u6536\u5165");
+  const items = await getEnabledItems("收入");
   const note = parseNote(text);
-  const ballsUsed = parseAmount(text, "\u8017\u7403");
+  const ballsUsed = parseAmount(text, "耗球");
   const records = [];
 
   for (const item of items) {
     const amount = parseAmount(text, item);
-
     if (amount > 0) {
-      records.push({
-        type: "\u6536\u5165",
-        item,
-        income: amount,
-        note,
-      });
+      records.push({ type: "收入", item, income: amount, note });
     }
   }
 
   if (ballsUsed > 0) {
-    records.push({
-      type: "\u5eab\u5b58",
-      item: "\u8017\u7403",
-      ballsUsed,
-      note,
-    });
+    records.push({ type: "庫存", item: "耗球", ballsUsed, note });
   }
 
   if (!records.length) {
-    throw new Error("\u6c92\u6709\u8b80\u5230\u6536\u5165\u91d1\u984d\u6216\u8017\u7403\u6578\u3002\u8acb\u78ba\u8a8d\u683c\u5f0f\uff0c\u4f8b\u5982\uff1a\u96f6\u6253\uff1a500\u3001\u8017\u7403\uff1a18");
+    throw new Error("沒有讀到收入金額或耗球數。請確認格式，例如：零打：500、耗球：18");
   }
 
   await appendRecords(records, user);
@@ -83,16 +70,16 @@ async function handleIncome(text, user) {
   const stock = await getCurrentStock();
   const my = await getSummary("month", user.id);
 
-  return `\u2705 \u6536\u5165\u5b8c\u6210
+  return `✅ 收入完成
 
-\u586b\u8868\u4eba\uff1a${user.name}
-\u6536\u5165\u5408\u8a08\uff1a${incomeTotal} \u5143
-\u8017\u7403\uff1a${ballsUsed} \u9846
+填表人：${user.name}
+收入合計：${incomeTotal} 元
+耗球：${ballsUsed} 顆
 
-\ud83c\udff8 \u5269\u9918\u5eab\u5b58\uff1a${formatStock(stock)}
-\ud83d\udcb0 \u6211\u7684\u672a\u4ea4\uff1a${my.unpaid} \u5143
+🏸 剩餘庫存：${formatStock(stock)}
+💰 我的未交：${my.unpaid} 元
 
-\u5099\u8a3b\uff1a${note || "\u7121"}`;
+備註：${note || "無"}`;
 }
 
 module.exports = {
