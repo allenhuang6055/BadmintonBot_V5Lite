@@ -99,3 +99,13 @@ PARSE_INCOME_RESULT
 贊助 1000
 耗球 20
 ```
+
+
+---
+
+# V9.2.1 更新：訊息簡潔版
+
+- LINE 回覆不再顯示「已將 XXX 辨識為 XXX」。
+- 模糊辨識仍然保留。
+- Render Logs 仍保留完整 `PARSE_INCOME_RESULT`。
+- 只有真的有未辨識項目時，才會在 LINE 回覆提醒。

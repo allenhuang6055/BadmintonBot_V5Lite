@@ -42,12 +42,6 @@ async function handleIncome(text, user) {
   const incomeLines = [];
   const warningLines = [];
 
-  for (const m of parsed.matched) {
-    if (m.mode === "fuzzy") {
-      warningLines.push(`⚠️ 已將「${m.input}」辨識為「${m.label}」`);
-    }
-  }
-
   for (const u of parsed.unknown) {
     warningLines.push(`⚠️ 未辨識項目：「${u.input}」${money(u.amount)} 元，未寫入`);
   }
