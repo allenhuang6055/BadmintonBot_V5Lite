@@ -1,53 +1,52 @@
-# 健好羽球 LINE Bot V8.1 群組通知版
+# 健好羽球 LINE Bot V8.2 群組查詢與每日報表版
 
-本版以目前可正常運作的 V8 專案為基礎，只新增群組通知功能。
+## 新增功能
 
-## V8.1 新增
+在群組輸入：
 
-- 在球隊群組輸入 `群組ID`，Bot 會回覆群組 ID。
-- Render Environment 加入 `LINE_GROUP_ID` 後，幹部私訊 Bot 記帳完成會自動通知球隊群組。
-- 沒有設定 `LINE_GROUP_ID` 時，原本收入、支出、交款功能仍可正常使用，不會報錯。
+```text
+今天
+```
+
+Bot 回覆今日收支、耗球、庫存。
+
+```text
+庫存
+```
+
+Bot 回覆目前剩餘幾桶幾顆。
+
+```text
+月報
+```
+
+Bot 回覆本月收入、支出、盈餘、耗球、庫存。
+
+另外可設定每日晚上 10 點自動推送今日財務摘要到群組。
+
+## Render Environment
+
+```text
+LINE_GROUP_ID=C6bf48da7ba1ea9a81f9ef4bb36f141a7
+DAILY_REPORT_ENABLED=true
+DAILY_REPORT_TIME=22:00
+```
 
 ## 部署
 
-覆蓋原本 `C:\BadmintonBot_V5Lite` 後：
-
 ```bat
 cd /d C:\BadmintonBot_V5Lite
+npm install
 git add .
-git commit -m "Upgrade to V8.1 group notify"
+git commit -m "Upgrade to V8.2 group query daily report"
 git push
 ```
 
-## 設定群組通知
-
-1. 把官方帳號 Bot 加入球隊群組。
-2. 在球隊群組輸入：
+Render Logs 應看到：
 
 ```text
-群組ID
+DAILY_REPORT_ENABLED: 22:00 Asia/Taipei
+BadmintonBot V8.2 running on port 10000
 ```
 
-3. Bot 會回覆一串 `Cxxxxxxxxxxxx`。
-4. 到 Render → Environment 新增：
-
-```text
-LINE_GROUP_ID=剛剛取得的群組ID
-```
-
-5. Save Changes，等 Render 重新部署 Live。
-
-## 測試
-
-私訊 Bot：
-
-```text
-零打：100
-耗球：1
-備註：V8.1測試
-```
-
-成功後：
-
-1. 私訊會回覆記帳完成。
-2. 球隊群組會收到記帳通知。
+注意：Render Free 方案如果服務休眠，每日固定時間報表可能不會準時送出；群組查詢與記帳通知不受影響。

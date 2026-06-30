@@ -10,6 +10,7 @@ const { incomeTemplate, isIncomeRecord, handleIncome } = require("./commands/inc
 const { expenseTemplate, isExpenseRecord, handleExpense } = require("./commands/expense");
 const { paymentTemplate, isPaymentRecord, handlePayment } = require("./commands/payment");
 const { handleToday, handleMonth, handleMyUnpaid, handleStock } = require("./commands/query");
+const { startDailyReport } = require("./services/scheduledReport");
 
 const app = express();
 
@@ -23,7 +24,7 @@ const client = new line.messagingApi.MessagingApiClient({
 });
 
 app.get("/", (req, res) => {
-  res.send("BadmintonBot V8.1 group notify is running");
+  res.send("BadmintonBot V8.2 group query and daily report is running");
 });
 
 app.post("/webhook", line.middleware(config), async (req, res) => {
@@ -99,11 +100,11 @@ LINE_GROUP_ID=${event.source.groupId}`
       return replyText(event.replyToken, paymentTemplate());
     }
 
-    if (text === "今天" || text === "今日") {
+    if (text === "今天" || text === "今日" || text === "今日財務" || text === "今日報表") {
       return replyText(event.replyToken, await handleToday());
     }
 
-    if (text === "本月" || text === "月報") {
+    if (text === "本月" || text === "月報" || text === "本月報表") {
       return replyText(event.replyToken, await handleMonth());
     }
 
@@ -146,5 +147,6 @@ LINE_GROUP_ID=${event.source.groupId}`
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`BadmintonBot V8.1 running on port ${port}`);
+  startDailyReport(client);
+  console.log(`BadmintonBot V8.2 running on port ${port}`);
 });
