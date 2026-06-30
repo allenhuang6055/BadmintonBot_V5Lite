@@ -6,6 +6,7 @@ const {
   formatStock,
 } = require("../services/googleSheet");
 const { parseNote, parseByFuzzyLines } = require("../services/parser");
+const { parseRecordDate } = require("../services/dateParser");
 
 function money(value) {
   return Number(value || 0).toLocaleString("zh-TW");
@@ -31,6 +32,7 @@ async function handleIncome(text, user) {
   const items = await getEnabledItems("收入");
   const labels = [...items, "耗球"];
   const note = parseNote(text);
+  const recordDate = parseRecordDate(text);
   const parsed = parseByFuzzyLines(text, labels);
 
   const records = [];
@@ -39,13 +41,13 @@ async function handleIncome(text, user) {
   for (const item of items) {
     const amount = Number(parsed.result[item] || 0);
     if (amount > 0) {
-      records.push({ type: "收入", item, income: amount, note });
+      records.push({ type: "收入", item, income: amount, note, date: recordDate });
       incomeLines.push(`・${item}：${money(amount)} 元`);
     }
   }
 
   const ballsUsed = Number(parsed.result["耗球"] || 0);
-  if (ballsUsed > 0) records.push({ type: "庫存", item: "耗球", ballsUsed, note });
+  if (ballsUsed > 0) records.push({ type: "庫存", item: "耗球", ballsUsed, note, date: recordDate });
 
   console.log("PARSE_INCOME_RESULT:", JSON.stringify({
     user: user.name,
@@ -81,6 +83,7 @@ ${incomeBlock}
 🏸 剩餘庫存：${formatStock(stock)}
 💰 我的未交：${money(my.unpaid)} 元
 
+日期：${recordDate || "今日"}
 備註：${note || "無"}`;
 }
 

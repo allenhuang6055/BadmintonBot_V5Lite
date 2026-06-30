@@ -1,5 +1,6 @@
 const { getEnabledItems, appendRecords, getSummary } = require("../services/googleSheet");
 const { parseNote, parseByFuzzyLines } = require("../services/parser");
+const { parseRecordDate } = require("../services/dateParser");
 
 function money(value) {
   return Number(value || 0).toLocaleString("zh-TW");
@@ -18,6 +19,7 @@ ${body}
 async function handleExpense(text, user) {
   const items = await getEnabledItems("支出");
   const note = parseNote(text);
+  const recordDate = parseRecordDate(text);
   const parsed = parseByFuzzyLines(text, items);
 
   const records = [];
@@ -26,7 +28,7 @@ async function handleExpense(text, user) {
   for (const item of items) {
     const amount = Number(parsed.result[item] || 0);
     if (amount > 0) {
-      records.push({ type: "支出", item, expense: amount, note });
+      records.push({ type: "支出", item, expense: amount, note, date: recordDate });
       expenseLines.push(`・${item}：${money(amount)} 元`);
     }
   }
@@ -56,6 +58,7 @@ ${expenseLines.join("\n")}
 支出合計：${money(total)} 元
 本月盈餘：${money(month.profit)} 元
 
+日期：${recordDate || "今日"}
 備註：${note || "無"}`;
 }
 

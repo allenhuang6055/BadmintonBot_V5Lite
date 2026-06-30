@@ -1,7 +1,7 @@
 {
-  "name": "badmintonbot-v10-session-stable",
-  "version": "10.0.0",
-  "description": "健好羽球 LINE Bot V10 狀態流程穩定版",
+  "name": "badmintonbot-v10-1-date-stock-fix",
+  "version": "10.1.0",
+  "description": "健好羽球 LINE Bot V10.1 補單日期與庫存修正版",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
