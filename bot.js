@@ -6,11 +6,18 @@ const line = require("@line/bot-sdk");
 const { mainMenuMessage } = require("./config/menu");
 const { getUser } = require("./services/lineUser");
 const { pushGroupMessage, buildGroupNotice, groupConfigText, hasGroupId } = require("./services/groupNotify");
-const { incomeTemplate, isIncomeRecord, handleIncome } = require("./commands/income");
-const { expenseTemplate, isExpenseRecord, handleExpense } = require("./commands/expense");
-const { paymentTemplate, isPaymentRecord, handlePayment } = require("./commands/payment");
+const { setSession, getSession, clearSession, sessionName } = require("./services/sessionStore");
+const { incomeTemplate, handleIncome } = require("./commands/income");
+const { expenseTemplate, handleExpense } = require("./commands/expense");
+const { paymentTemplate, handlePayment } = require("./commands/payment");
 const { handleToday, handleMonth, handleMyUnpaid, handleStock } = require("./commands/query");
-const { startDailyReport } = require("./services/scheduledReport");
+
+let startDailyReport = null;
+try {
+  startDailyReport = require("./services/scheduledReport").startDailyReport;
+} catch (err) {
+  startDailyReport = null;
+}
 
 const app = express();
 
@@ -24,7 +31,7 @@ const client = new line.messagingApi.MessagingApiClient({
 });
 
 app.get("/", (req, res) => {
-  res.send("BadmintonBot V9.2.2 stable fix is running");
+  res.send("BadmintonBot V10 session stable is running");
 });
 
 app.post("/webhook", line.middleware(config), async (req, res) => {
@@ -48,16 +55,13 @@ async function replyMessages(replyToken, messages) {
   return client.replyMessage({ replyToken, messages });
 }
 
-function getSourceType(event) {
-  return event.source?.type || "";
-}
-
 async function notifyGroupSafely(kind, user, resultText, event) {
   try {
     if (event?.source?.type === "group") {
       console.log("GROUP_NOTIFY_SKIPPED: source is group, reply only");
       return;
     }
+
     const notice = buildGroupNotice(kind, user, resultText);
     await pushGroupMessage(client, notice);
   } catch (err) {
@@ -69,6 +73,53 @@ function incomeNoticeKind(resultText) {
   return resultText.includes("耗球記錄完成") ? "stock" : "income";
 }
 
+async function startMode(event, mode) {
+  setSession(event, mode);
+
+  if (mode === "income") return replyText(event.replyToken, await incomeTemplate());
+  if (mode === "expense") return replyText(event.replyToken, await expenseTemplate());
+  if (mode === "payment") return replyText(event.replyToken, paymentTemplate());
+
+  return replyText(event.replyToken, "請重新輸入「收入」「支出」或「交款」。");
+}
+
+function isCancel(text) {
+  return ["取消", "取消操作", "重新", "重來", "停止"].includes(text);
+}
+
+async function handleSessionInput(event, text, user) {
+  const session = getSession(event);
+  if (!session) return false;
+
+  if (isCancel(text)) {
+    clearSession(event);
+    await replyText(event.replyToken, `已取消「${sessionName(session.mode)}」操作。`);
+    return true;
+  }
+
+  let resultText = "";
+  let kind = "";
+
+  if (session.mode === "income") {
+    resultText = await handleIncome(text, user);
+    kind = incomeNoticeKind(resultText);
+  } else if (session.mode === "expense") {
+    resultText = await handleExpense(text, user);
+    kind = "expense";
+  } else if (session.mode === "payment") {
+    resultText = await handlePayment(text, user);
+    kind = "payment";
+  } else {
+    clearSession(event);
+    return false;
+  }
+
+  clearSession(event);
+  await notifyGroupSafely(kind, user, resultText, event);
+  await replyText(event.replyToken, resultText);
+  return true;
+}
+
 async function handleEvent(event) {
   if (event.type !== "message" || event.message.type !== "text") return;
 
@@ -77,7 +128,7 @@ async function handleEvent(event) {
 
   try {
     if (text === "群組ID" || text.toLowerCase() === "groupid") {
-      if (getSourceType(event) !== "group" || !event.source.groupId) {
+      if (event.source?.type !== "group" || !event.source.groupId) {
         return replyText(event.replyToken, "這個指令請在球隊群組裡輸入，才會顯示 groupId。");
       }
 
@@ -108,52 +159,42 @@ LINE_GROUP_ID=${event.source.groupId}`
       return replyMessages(event.replyToken, [mainMenuMessage()]);
     }
 
-    if (text === "收入" || text === "💰 收入" || text === "今日收入") {
-      return replyText(event.replyToken, await incomeTemplate());
-    }
-
-    if (text === "支出" || text === "💸 支出") {
-      return replyText(event.replyToken, await expenseTemplate());
-    }
-
-    if (text === "交款" || text === "💵 交款" || text === "幹部交款") {
-      return replyText(event.replyToken, paymentTemplate());
-    }
-
+    // 查詢指令一定優先，且不寫入資料庫。
     if (text === "今天" || text === "今日" || text === "今日財務" || text === "今日報表") {
+      clearSession(event);
       return replyText(event.replyToken, await handleToday());
     }
 
     if (text === "本月" || text === "月報" || text === "本月報表") {
+      clearSession(event);
       return replyText(event.replyToken, await handleMonth());
     }
 
     if (text === "我的未交" || text === "未交款") {
+      clearSession(event);
       return replyText(event.replyToken, await handleMyUnpaid(user));
     }
 
     if (text === "球庫存" || text === "庫存") {
+      clearSession(event);
       return replyText(event.replyToken, await handleStock());
     }
 
-    // V9.2.2 穩定修正：交款與支出要優先於收入，避免被收入模糊辨識誤抓。
-    if (isPaymentRecord(text)) {
-      const resultText = await handlePayment(text, user);
-      await notifyGroupSafely("payment", user, resultText, event);
-      return replyText(event.replyToken, resultText);
+    // 明確模式指令：建立 Session。下一則訊息 100% 走指定流程，不再猜。
+    if (text === "收入" || text === "💰 收入" || text === "今日收入") {
+      return startMode(event, "income");
     }
 
-    if (await isExpenseRecord(text)) {
-      const resultText = await handleExpense(text, user);
-      await notifyGroupSafely("expense", user, resultText, event);
-      return replyText(event.replyToken, resultText);
+    if (text === "支出" || text === "💸 支出") {
+      return startMode(event, "expense");
     }
 
-    if (await isIncomeRecord(text)) {
-      const resultText = await handleIncome(text, user);
-      await notifyGroupSafely(incomeNoticeKind(resultText), user, resultText, event);
-      return replyText(event.replyToken, resultText);
+    if (text === "交款" || text === "💵 交款" || text === "幹部交款") {
+      return startMode(event, "payment");
     }
+
+    // 有 Session 時直接照 Session 處理，不跑其他 parser。
+    if (await handleSessionInput(event, text, user)) return;
 
     return;
   } catch (err) {
@@ -162,12 +203,12 @@ LINE_GROUP_ID=${event.source.groupId}`
 
 原因：${err.message}
 
-請輸入「選單」重新操作。`);
+請輸入「收入」「支出」或「交款」重新操作。`);
   }
 }
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  startDailyReport(client);
-  console.log(`BadmintonBot V9.2.2 running on port ${port}`);
+  if (typeof startDailyReport === "function") startDailyReport(client);
+  console.log(`BadmintonBot V10 running on port ${port}`);
 });

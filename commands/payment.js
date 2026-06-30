@@ -1,5 +1,5 @@
 const { appendRecords, getSummary } = require("../services/googleSheet");
-const { parseAmount, parseNote, hasAnyLabel } = require("../services/parser");
+const { parseAmount, parseNote } = require("../services/parser");
 
 function money(value) {
   return Number(value || 0).toLocaleString("zh-TW");
@@ -13,23 +13,13 @@ function paymentTemplate() {
 備註：`;
 }
 
-function isPaymentRecord(text) {
-  return hasAnyLabel(text, ["交款"]);
-}
-
 async function handlePayment(text, user) {
   const amount = parseAmount(text, "交款");
   const note = parseNote(text);
 
-  console.log("PARSE_PAYMENT_RESULT:", JSON.stringify({
-    user: user.name,
-    text,
-    payment: amount,
-  }));
+  console.log("PARSE_PAYMENT_RESULT:", JSON.stringify({ user: user.name, text, payment: amount }));
 
-  if (amount <= 0) {
-    throw new Error("沒有讀到交款金額。請確認格式，例如：交款：5000");
-  }
+  if (amount <= 0) throw new Error("沒有讀到交款金額。");
 
   await appendRecords([{ type: "交款", item: "交款", payment: amount, note }], user);
 
@@ -47,6 +37,5 @@ async function handlePayment(text, user) {
 
 module.exports = {
   paymentTemplate,
-  isPaymentRecord,
   handlePayment,
 };

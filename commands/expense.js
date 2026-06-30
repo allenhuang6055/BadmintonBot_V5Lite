@@ -1,5 +1,5 @@
 const { getEnabledItems, appendRecords, getSummary } = require("../services/googleSheet");
-const { parseNote, hasAnyLabel, parseByFuzzyLines } = require("../services/parser");
+const { parseNote, parseByFuzzyLines } = require("../services/parser");
 
 function money(value) {
   return Number(value || 0).toLocaleString("zh-TW");
@@ -15,22 +15,13 @@ ${body}
 備註：`;
 }
 
-async function isExpenseRecord(text) {
-  const items = await getEnabledItems("支出");
-  return hasAnyLabel(text, items);
-}
-
 async function handleExpense(text, user) {
   const items = await getEnabledItems("支出");
   const note = parseNote(text);
   const parsed = parseByFuzzyLines(text, items);
+
   const records = [];
   const expenseLines = [];
-  const warningLines = [];
-
-  for (const u of parsed.unknown) {
-    warningLines.push(`⚠️ 未辨識項目：「${u.input}」${money(u.amount)} 元，未寫入`);
-  }
 
   for (const item of items) {
     const amount = Number(parsed.result[item] || 0);
@@ -48,17 +39,12 @@ async function handleExpense(text, user) {
     result: parsed.result,
   }));
 
-  if (!records.length) {
-    throw new Error("沒有讀到支出金額。請確認格式，例如：買球：690、場租：1000");
-  }
+  if (!records.length) throw new Error("沒有讀到支出金額。");
 
   await appendRecords(records, user);
 
   const total = records.reduce((sum, r) => sum + (r.expense || 0), 0);
   const month = await getSummary("month");
-  const warningBlock = warningLines.length ? `
-
-${warningLines.join("\n")}` : "";
 
   return `✅ 支出完成
 
@@ -70,11 +56,10 @@ ${expenseLines.join("\n")}
 支出合計：${money(total)} 元
 本月盈餘：${money(month.profit)} 元
 
-備註：${note || "無"}${warningBlock}`;
+備註：${note || "無"}`;
 }
 
 module.exports = {
   expenseTemplate,
-  isExpenseRecord,
   handleExpense,
 };

@@ -5,7 +5,7 @@ const {
   getCurrentStock,
   formatStock,
 } = require("../services/googleSheet");
-const { parseNote, hasAnyLabel, parseByFuzzyLines } = require("../services/parser");
+const { parseNote, parseByFuzzyLines } = require("../services/parser");
 
 function money(value) {
   return Number(value || 0).toLocaleString("zh-TW");
@@ -27,11 +27,6 @@ ${body}
 備註：`;
 }
 
-async function isIncomeRecord(text) {
-  const items = await getEnabledItems("收入");
-  return hasAnyLabel(text, [...items, "耗球"]);
-}
-
 async function handleIncome(text, user) {
   const items = await getEnabledItems("收入");
   const labels = [...items, "耗球"];
@@ -40,11 +35,6 @@ async function handleIncome(text, user) {
 
   const records = [];
   const incomeLines = [];
-  const warningLines = [];
-
-  for (const u of parsed.unknown) {
-    warningLines.push(`⚠️ 未辨識項目：「${u.input}」${money(u.amount)} 元，未寫入`);
-  }
 
   for (const item of items) {
     const amount = Number(parsed.result[item] || 0);
@@ -55,9 +45,7 @@ async function handleIncome(text, user) {
   }
 
   const ballsUsed = Number(parsed.result["耗球"] || 0);
-  if (ballsUsed > 0) {
-    records.push({ type: "庫存", item: "耗球", ballsUsed, note });
-  }
+  if (ballsUsed > 0) records.push({ type: "庫存", item: "耗球", ballsUsed, note });
 
   console.log("PARSE_INCOME_RESULT:", JSON.stringify({
     user: user.name,
@@ -67,9 +55,7 @@ async function handleIncome(text, user) {
     result: parsed.result,
   }));
 
-  if (!records.length) {
-    throw new Error("沒有讀到收入金額或耗球數。可輸入例如：會員800、會員費800、會費 800、零打：500、球劵1600、耗球：18");
-  }
+  if (!records.length) throw new Error("沒有讀到收入金額或耗球數。");
 
   await appendRecords(records, user);
 
@@ -85,10 +71,6 @@ ${incomeLines.join("\n")}
 收入合計：${money(incomeTotal)} 元`
     : "收入合計：0 元";
 
-  const warningBlock = warningLines.length ? `
-
-${warningLines.join("\n")}` : "";
-
   return `${title}
 
 填表人：${user.name}
@@ -99,11 +81,10 @@ ${incomeBlock}
 🏸 剩餘庫存：${formatStock(stock)}
 💰 我的未交：${money(my.unpaid)} 元
 
-備註：${note || "無"}${warningBlock}`;
+備註：${note || "無"}`;
 }
 
 module.exports = {
   incomeTemplate,
-  isIncomeRecord,
   handleIncome,
 };
