@@ -95,10 +95,12 @@ function normalizeBool(value) {
 
 function formatStock(balls) {
   const value = Number(balls || 0);
-  const tubes = Math.floor(value / 12);
-  const rest = value % 12;
-  if (rest === 0) return `${tubes}桶`;
-  return `${tubes}桶 + ${rest}顆`;
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.abs(value);
+  const tubes = Math.floor(abs / 12);
+  const rest = abs % 12;
+  if (rest === 0) return `${sign}${tubes}桶`;
+  return `${sign}${tubes}桶 ${rest}顆`;
 }
 
 async function getEnabledItems(type) {

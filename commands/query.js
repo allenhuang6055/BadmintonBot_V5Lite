@@ -26,10 +26,7 @@ function monthTaipeiText() {
     year: "numeric",
     month: "2-digit",
   }).formatToParts(new Date());
-
-  const year = parts.find((p) => p.type === "year")?.value || "";
-  const month = parts.find((p) => p.type === "month")?.value || "";
-  return `${year}/${month}`;
+  return `${parts.find((p) => p.type === "year")?.value || ""}/${parts.find((p) => p.type === "month")?.value || ""}`;
 }
 
 function money(value) {

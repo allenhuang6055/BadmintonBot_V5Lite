@@ -5,7 +5,7 @@ const line = require("@line/bot-sdk");
 
 const { mainMenuMessage } = require("./config/menu");
 const { getUser } = require("./services/lineUser");
-const { pushGroupMessage, buildGroupNotice } = require("./services/groupNotify");
+const { pushGroupMessage, buildGroupNotice, groupConfigText, hasGroupId } = require("./services/groupNotify");
 const { incomeTemplate, isIncomeRecord, handleIncome } = require("./commands/income");
 const { expenseTemplate, isExpenseRecord, handleExpense } = require("./commands/expense");
 const { paymentTemplate, isPaymentRecord, handlePayment } = require("./commands/payment");
@@ -24,7 +24,7 @@ const client = new line.messagingApi.MessagingApiClient({
 });
 
 app.get("/", (req, res) => {
-  res.send("BadmintonBot V8.2 group query and daily report is running");
+  res.send("BadmintonBot V9 final upgrade is running");
 });
 
 app.post("/webhook", line.middleware(config), async (req, res) => {
@@ -52,13 +52,21 @@ function getSourceType(event) {
   return event.source?.type || "";
 }
 
-async function notifyGroupSafely(kind, user, resultText) {
+async function notifyGroupSafely(kind, user, resultText, event) {
   try {
+    if (event?.source?.type === "group") {
+      console.log("GROUP_NOTIFY_SKIPPED: source is group, reply only");
+      return;
+    }
     const notice = buildGroupNotice(kind, user, resultText);
     await pushGroupMessage(client, notice);
   } catch (err) {
     console.error("GROUP_NOTIFY_FAILED:", err.message);
   }
+}
+
+function incomeNoticeKind(resultText) {
+  return resultText.includes("耗球記錄完成") ? "stock" : "income";
 }
 
 async function handleEvent(event) {
@@ -82,6 +90,18 @@ ${event.source.groupId}
 請到 Render → Environment 新增或修改：
 LINE_GROUP_ID=${event.source.groupId}`
       );
+    }
+
+    if (text === "群組通知設定" || text === "通知設定") {
+      return replyText(event.replyToken, groupConfigText());
+    }
+
+    if (text === "群組測試") {
+      if (!hasGroupId()) {
+        return replyText(event.replyToken, "❌ 尚未設定 LINE_GROUP_ID。請先在群組輸入「群組ID」，再把 ID 加到 Render Environment。");
+      }
+      await pushGroupMessage(client, `✅ 群組通知測試成功\n\n發送人：${user.name}\n時間：${new Date().toLocaleString("zh-TW", { timeZone: "Asia/Taipei" })}`);
+      return replyText(event.replyToken, "✅ 已送出群組測試通知。");
     }
 
     if (text === "選單" || text === "功能" || text.toLowerCase() === "menu") {
@@ -118,19 +138,19 @@ LINE_GROUP_ID=${event.source.groupId}`
 
     if (await isIncomeRecord(text)) {
       const resultText = await handleIncome(text, user);
-      await notifyGroupSafely("income", user, resultText);
+      await notifyGroupSafely(incomeNoticeKind(resultText), user, resultText, event);
       return replyText(event.replyToken, resultText);
     }
 
     if (await isExpenseRecord(text)) {
       const resultText = await handleExpense(text, user);
-      await notifyGroupSafely("expense", user, resultText);
+      await notifyGroupSafely("expense", user, resultText, event);
       return replyText(event.replyToken, resultText);
     }
 
     if (isPaymentRecord(text)) {
       const resultText = await handlePayment(text, user);
-      await notifyGroupSafely("payment", user, resultText);
+      await notifyGroupSafely("payment", user, resultText, event);
       return replyText(event.replyToken, resultText);
     }
 
@@ -148,5 +168,5 @@ LINE_GROUP_ID=${event.source.groupId}`
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   startDailyReport(client);
-  console.log(`BadmintonBot V8.2 running on port ${port}`);
+  console.log(`BadmintonBot V9 running on port ${port}`);
 });

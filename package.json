@@ -1,7 +1,7 @@
 {
-  "name": "badmintonbot-v8-2-1-monthly-balance",
-  "version": "8.2.1",
-  "description": "健好羽球 LINE Bot V8.2.1 月報資金餘額版",
+  "name": "badmintonbot-v9-2-fuzzy-parser",
+  "version": "9.2.0",
+  "description": "健好羽球 LINE Bot V9.2 模糊辨識防漏版",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"

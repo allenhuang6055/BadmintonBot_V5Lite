@@ -5,20 +5,10 @@ const {
   getCurrentStock,
   formatStock,
 } = require("../services/googleSheet");
+const { parseNote, hasAnyLabel, parseByFuzzyLines } = require("../services/parser");
 
-function parseAmount(text, label) {
-  const safe = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`${safe}\\s*[:：=]?\\s*([0-9,]+)`, "i");
-  const m = text.match(re);
-  if (!m) return 0;
-
-  const num = Number(String(m[1]).replace(/,/g, ""));
-  return Number.isFinite(num) && num >= 0 ? num : 0;
-}
-
-function parseNote(text) {
-  const m = text.match(/備註\s*[:：=]?\s*(.*)/i);
-  return m ? String(m[1] || "").trim() : "";
+function money(value) {
+  return Number(value || 0).toLocaleString("zh-TW");
 }
 
 async function incomeTemplate() {
@@ -38,30 +28,53 @@ ${body}
 }
 
 async function isIncomeRecord(text) {
-  if (/耗球\s*[:：=]/.test(text)) return true;
   const items = await getEnabledItems("收入");
-  return items.some((item) => new RegExp(`${item}\\s*[:：=]`).test(text));
+  return hasAnyLabel(text, [...items, "耗球"]);
 }
 
 async function handleIncome(text, user) {
   const items = await getEnabledItems("收入");
+  const labels = [...items, "耗球"];
   const note = parseNote(text);
-  const ballsUsed = parseAmount(text, "耗球");
-  const records = [];
+  const parsed = parseByFuzzyLines(text, labels);
 
-  for (const item of items) {
-    const amount = parseAmount(text, item);
-    if (amount > 0) {
-      records.push({ type: "收入", item, income: amount, note });
+  const records = [];
+  const incomeLines = [];
+  const warningLines = [];
+
+  for (const m of parsed.matched) {
+    if (m.mode === "fuzzy") {
+      warningLines.push(`⚠️ 已將「${m.input}」辨識為「${m.label}」`);
     }
   }
 
+  for (const u of parsed.unknown) {
+    warningLines.push(`⚠️ 未辨識項目：「${u.input}」${money(u.amount)} 元，未寫入`);
+  }
+
+  for (const item of items) {
+    const amount = Number(parsed.result[item] || 0);
+    if (amount > 0) {
+      records.push({ type: "收入", item, income: amount, note });
+      incomeLines.push(`・${item}：${money(amount)} 元`);
+    }
+  }
+
+  const ballsUsed = Number(parsed.result["耗球"] || 0);
   if (ballsUsed > 0) {
     records.push({ type: "庫存", item: "耗球", ballsUsed, note });
   }
 
+  console.log("PARSE_INCOME_RESULT:", JSON.stringify({
+    user: user.name,
+    text,
+    parsed: parsed.matched,
+    unknown: parsed.unknown,
+    result: parsed.result,
+  }));
+
   if (!records.length) {
-    throw new Error("沒有讀到收入金額或耗球數。請確認格式，例如：零打：500、耗球：18");
+    throw new Error("沒有讀到收入金額或耗球數。可輸入例如：會員800、會員費800、會費 800、零打：500、球劵1600、耗球：18");
   }
 
   await appendRecords(records, user);
@@ -70,21 +83,34 @@ async function handleIncome(text, user) {
   const stock = await getCurrentStock();
   const my = await getSummary("month", user.id);
 
-  return `✅ 收入完成
+  const title = incomeTotal > 0 ? "✅ 收入完成" : "✅ 耗球記錄完成";
+  const incomeBlock = incomeTotal > 0
+    ? `收入明細：
+${incomeLines.join("\n")}
+
+收入合計：${money(incomeTotal)} 元`
+    : "收入合計：0 元";
+
+  const warningBlock = warningLines.length
+    ? `
+
+${warningLines.join("\n")}`
+    : "";
+
+  return `${title}
 
 填表人：${user.name}
-收入合計：${incomeTotal} 元
-耗球：${ballsUsed} 顆
+
+${incomeBlock}
+耗球：${money(ballsUsed)} 顆
 
 🏸 剩餘庫存：${formatStock(stock)}
-💰 我的未交：${my.unpaid} 元
+💰 我的未交：${money(my.unpaid)} 元
 
-備註：${note || "無"}`;
+備註：${note || "無"}${warningBlock}`;
 }
 
 module.exports = {
-  parseAmount,
-  parseNote,
   incomeTemplate,
   isIncomeRecord,
   handleIncome,
