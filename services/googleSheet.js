@@ -259,10 +259,58 @@ async function getCurrentStock() {
   return initialStock + ballsIn - ballsUsed;
 }
 
+async function getCurrentBalance() {
+  let initialCash = 0;
+  try {
+    const homeRows = await getRows(HOME_SHEET, "B5:B5");
+    initialCash = n(homeRows[0]?.[0]);
+  } catch (err) {
+    console.error("READ_INITIAL_CASH_FAILED:", err.message);
+  }
+
+  const rows = await getRows(DB_SHEET, "A:AA");
+  let income = 0;
+  let expense = 0;
+
+  for (const row of rows.slice(3)) {
+    const status = String(row[11] || "").trim() || "有效";
+    if (status !== "有效") continue;
+    income += n(row[22] ?? row[5]);
+    expense += n(row[23] ?? row[6]);
+  }
+
+  return initialCash + income - expense;
+}
+
+async function getSafetyCash() {
+  try {
+    const rows = await getRows("07_年度預算", "B5:B5");
+    const value = n(rows[0]?.[0]);
+    if (value > 0) return value;
+  } catch (err) {
+    console.error("READ_SAFETY_CASH_FAILED:", err.message);
+  }
+  return 150000;
+}
+
+function getCashStatus(balance, safetyCash) {
+  if (balance >= safetyCash) return "🟢 財務狀況：正常";
+  return "🔴 財務狀況：低於安全水位，請留意支出。";
+}
+
+function getStockStatus(balls) {
+  if (Number(balls || 0) < 120) return "⚠️ 庫存狀態：偏低，建議補貨。";
+  return "🟢 庫存狀態：正常";
+}
+
 module.exports = {
   getEnabledItems,
   appendRecords,
   getSummary,
   getCurrentStock,
   formatStock,
+  getCurrentBalance,
+  getSafetyCash,
+  getCashStatus,
+  getStockStatus,
 };

@@ -1,7 +1,7 @@
 {
-  "name": "badmintonbot-v8-2-group-query-daily-report",
-  "version": "8.2.0",
-  "description": "健好羽球 LINE Bot V8.2 群組查詢與每日報表版",
+  "name": "badmintonbot-v8-2-1-monthly-balance",
+  "version": "8.2.1",
+  "description": "健好羽球 LINE Bot V8.2.1 月報資金餘額版",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
