@@ -24,7 +24,7 @@ const client = new line.messagingApi.MessagingApiClient({
 });
 
 app.get("/", (req, res) => {
-  res.send("BadmintonBot V9 final upgrade is running");
+  res.send("BadmintonBot V9.2.2 stable fix is running");
 });
 
 app.post("/webhook", line.middleware(config), async (req, res) => {
@@ -136,9 +136,10 @@ LINE_GROUP_ID=${event.source.groupId}`
       return replyText(event.replyToken, await handleStock());
     }
 
-    if (await isIncomeRecord(text)) {
-      const resultText = await handleIncome(text, user);
-      await notifyGroupSafely(incomeNoticeKind(resultText), user, resultText, event);
+    // V9.2.2 穩定修正：交款與支出要優先於收入，避免被收入模糊辨識誤抓。
+    if (isPaymentRecord(text)) {
+      const resultText = await handlePayment(text, user);
+      await notifyGroupSafely("payment", user, resultText, event);
       return replyText(event.replyToken, resultText);
     }
 
@@ -148,9 +149,9 @@ LINE_GROUP_ID=${event.source.groupId}`
       return replyText(event.replyToken, resultText);
     }
 
-    if (isPaymentRecord(text)) {
-      const resultText = await handlePayment(text, user);
-      await notifyGroupSafely("payment", user, resultText, event);
+    if (await isIncomeRecord(text)) {
+      const resultText = await handleIncome(text, user);
+      await notifyGroupSafely(incomeNoticeKind(resultText), user, resultText, event);
       return replyText(event.replyToken, resultText);
     }
 
@@ -168,5 +169,5 @@ LINE_GROUP_ID=${event.source.groupId}`
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   startDailyReport(client);
-  console.log(`BadmintonBot V9 running on port ${port}`);
+  console.log(`BadmintonBot V9.2.2 running on port ${port}`);
 });

@@ -28,11 +28,11 @@ const SYNONYMS = {
   耗球: ["耗球", "用球", "打球", "球耗", "消耗", "耗用"],
   買球: ["買球", "买球", "購球", "购球", "買羽球", "买羽球"],
   場租: ["場租", "场租", "租金", "場地", "场地", "場地費", "场地费"],
-  聚餐: ["聚餐", "餐費", "餐费", "吃飯", "吃饭"],
-  比賽: ["比賽", "比赛", "賽事", "赛事"],
+  聚餐: ["聚餐", "餐費", "餐费", "餐點", "餐点", "吃飯", "吃饭", "飲料", "饮料"],
+  比賽: ["比賽", "比赛", "賽事", "赛事", "友誼賽", "友谊赛"],
   行政: ["行政", "文具", "影印"],
   雜支: ["雜支", "杂支", "雜費", "杂费"],
-  交款: ["交款", "繳回", "缴回", "上繳", "上缴", "交回"],
+  交款: ["交款", "幹部交款", "干部交款", "繳回", "缴回", "上繳", "上缴", "交回"],
 };
 
 function aliasesFor(label) {
@@ -81,16 +81,33 @@ function extractLabelAmount(line) {
   return { label, amount };
 }
 
+function canonicalFromAlias(inputLabel) {
+  const clean = String(inputLabel || "").replace(/\s/g, "");
+  for (const [label, aliases] of Object.entries(SYNONYMS)) {
+    for (const alias of [label, ...aliases]) {
+      if (clean === String(alias || "").replace(/\s/g, "")) {
+        return label;
+      }
+    }
+  }
+  return null;
+}
+
 function bestMatchLabel(inputLabel, candidateLabels) {
   const clean = String(inputLabel || "").replace(/\s/g, "");
+  const canonical = canonicalFromAlias(clean);
+
+  // 如果輸入明確屬於其他類別，例如「交款」明確是交款，就不能被收入的「贊助/捐款」模糊吃掉。
+  if (canonical && !candidateLabels.includes(canonical)) {
+    return null;
+  }
+
   let best = null;
 
   for (const label of candidateLabels) {
     for (const alias of aliasesFor(label)) {
       const a = String(alias || "").replace(/\s/g, "");
       const distance = levenshtein(clean, a);
-
-      // 兩字以內：允許差 1 個字；三字以上：允許差 2 個字
       const threshold = Math.max(1, Math.floor(Math.max(clean.length, a.length) / 3));
 
       if (distance <= threshold) {
@@ -189,4 +206,5 @@ module.exports = {
   aliasesFor,
   parseByFuzzyLines,
   bestMatchLabel,
+  canonicalFromAlias,
 };

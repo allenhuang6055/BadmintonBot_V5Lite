@@ -85,11 +85,9 @@ ${incomeLines.join("\n")}
 收入合計：${money(incomeTotal)} 元`
     : "收入合計：0 元";
 
-  const warningBlock = warningLines.length
-    ? `
+  const warningBlock = warningLines.length ? `
 
-${warningLines.join("\n")}`
-    : "";
+${warningLines.join("\n")}` : "";
 
   return `${title}
 

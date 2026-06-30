@@ -1,5 +1,9 @@
 const { appendRecords, getSummary } = require("../services/googleSheet");
-const { parseAmount, parseNote } = require("./income");
+const { parseAmount, parseNote, hasAnyLabel } = require("../services/parser");
+
+function money(value) {
+  return Number(value || 0).toLocaleString("zh-TW");
+}
 
 function paymentTemplate() {
   return `💵 幹部交款
@@ -10,12 +14,18 @@ function paymentTemplate() {
 }
 
 function isPaymentRecord(text) {
-  return /交款\s*[:：=]/.test(text);
+  return hasAnyLabel(text, ["交款"]);
 }
 
 async function handlePayment(text, user) {
   const amount = parseAmount(text, "交款");
   const note = parseNote(text);
+
+  console.log("PARSE_PAYMENT_RESULT:", JSON.stringify({
+    user: user.name,
+    text,
+    payment: amount,
+  }));
 
   if (amount <= 0) {
     throw new Error("沒有讀到交款金額。請確認格式，例如：交款：5000");
@@ -28,9 +38,9 @@ async function handlePayment(text, user) {
   return `✅ 交款完成
 
 填表人：${user.name}
-交款：${amount} 元
+交款：${money(amount)} 元
 
-💰 我的未交：${my.unpaid} 元
+💰 我的未交：${money(my.unpaid)} 元
 
 備註：${note || "無"}`;
 }

@@ -1,7 +1,7 @@
 {
-  "name": "badmintonbot-v9-2-1-clean-message",
-  "version": "9.2.1",
-  "description": "健好羽球 LINE Bot V9.2.1 訊息簡潔版",
+  "name": "badmintonbot-v9-2-2-stable-fix",
+  "version": "9.2.2",
+  "description": "健好羽球 LINE Bot V9.2.2 穩定修正版",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
